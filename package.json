@@ -1,0 +1,10 @@
+{
+  "name": "jogo-penalti-turbo",
+  "version": "1.0.0",
+  "description": "Jogo de Pênalti — pronto para empacotar com Capacitor",
+  "scripts": {
+    "start": "npx http-server www -p 8100",
+    "build": "echo \"web build not required; files are in /www\""
+  },
+  "dependencies": {}
+}

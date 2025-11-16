@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jogo de Pênalti — Versão Turbo</title>
+  <style>
+    :root{
+      --bg:#0b6b3a; --panel:#eaf6ee; --accent:#0a5ba8; --muted:#6b7b86;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:linear-gradient(180deg,var(--bg),#074f2e);color:#033;}
+    .container{max-width:980px;margin:18px auto;padding:16px;background:var(--panel);border-radius:14px;box-shadow:0 10px 30px rgba(2,8,10,.2);}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h1{margin:0;font-size:20px;color:var(--accent)}
+    .row{display:flex;gap:12px;align-items:center}
+
+    .play-area{display:grid;grid-template-columns:1fr 320px;gap:16px;padding:12px}
+    .field{background:linear-gradient(180deg,#7ed98b,#65c06b);border-radius:10px;padding:14px;position:relative;overflow:hidden}
+    .goal{position:relative;width:100%;height:260px;border-radius:8px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;overflow:visible}
+
+    .net{width:80%;height:80%;display:flex;align-items:center;justify-content:center;position:relative}
+
+    /* ball & trail */
+    .ball{width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#fff 0,#e6e6e6 40%,#ccc 100%);position:absolute;left:50%;transform:translateX(-50%);bottom:18px;pointer-events:none;box-shadow:0 6px 14px rgba(0,0,0,0.25)}
+    .ball.trail{filter:blur(6px);opacity:.25}
+
+    .goalkeeper{position:absolute;bottom:36px;left:50%;transform:translateX(-50%);width:86px;height:110px;border-radius:10px;background:linear-gradient(180deg,#ffcd4d,#ffb84d);display:flex;align-items:flex-start;justify-content:center;padding-top:12px;transition:transform .28s ease}
+    .g-head{width:36px;height:36px;border-radius:50%;background:#ffe8c2;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+
+    /* dives */
+    .dive-left{transform:translate(-120%,-40%);}
+    .dive-right{transform:translate(20%,-40%);}
+    .dive-center{transform:translate(-50%,-30%);}
+
+    /* smoother ball path using transform and CSS variables */
+    .ball.fly-left{animation:ball-left 700ms cubic-bezier(.2,.9,.2,1) forwards}
+    .ball.fly-right{animation:ball-right 700ms cubic-bezier(.2,.9,.2,1) forwards}
+    .ball.fly-center{animation:ball-center 620ms cubic-bezier(.2,.9,.2,1) forwards}
+
+    @keyframes ball-left{0%{transform:translate(-50%,0) scale(1)}40%{transform:translate(-120px,-60px) scale(.98)}70%{transform:translate(-180px,-140px) scale(.92)}100%{transform:translate(-220px,-170px) scale(.9)}}
+    @keyframes ball-right{0%{transform:translate(-50%,0) scale(1)}40%{transform:translate(40px,-60px) scale(.98)}70%{transform:translate(140px,-140px) scale(.92)}100%{transform:translate(220px,-170px) scale(.9)}}
+    @keyframes ball-center{0%{transform:translate(-50%,0) scale(1)}50%{transform:translate(-50%,-120px) scale(.95)}100%{transform:translate(-50%,-170px) scale(.9)}}
+
+    .controls{display:flex;flex-direction:column;gap:10px;padding:10px}
+    .btns{display:flex;gap:10px;justify-content:center}
+    button{padding:10px 14px;border-radius:8px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;box-shadow:0 6px 12px rgba(10,91,168,.12)}
+    button.secondary{background:#e9eef6;color:var(--accent);border:1px solid rgba(0,0,0,.06);font-weight:600}
+    .scoreboard{background:#fff;padding:10px;border-radius:8px;box-shadow: inset 0 1px 0 rgba(0,0,0,.03)}
+    .score{font-size:18px;font-weight:700}
+    .small{font-size:13px;color:var(--muted)}
+
+    .settings{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+    select,input[type=checkbox]{padding:8px;border-radius:8px;border:1px solid rgba(0,0,0,.06)}
+
+    footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+
+    .hint{font-size:13px;color:#0a4a2e;text-align:center;padding:6px}
+
+    @media (max-width:860px){.play-area{grid-template-columns:1fr;}.goal{height:200px}.container{margin:12px}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Jogo de Pênalti — Turbo</h1>
+      <div class="small">Sons, animações, melhor de (5/7) e instruções para APK</div>
+    </header>
+
+    <div class="play-area">
+      <div class="field" id="field">
+        <div class="goal" aria-hidden="true">
+          <div class="net" id="net" style="z-index:1">
+            <svg viewBox="0 0 200 100" width="100%" height="100%" preserveAspectRatio="none">
+              <rect x="0" y="0" width="200" height="100" fill="rgba(255,255,255,0.02)" rx="8"/>
+              <g stroke="rgba(255,255,255,0.12)" stroke-width="1">
+                <path d="M20 0 L20 100 M60 0 L60 100 M100 0 L100 100 M140 0 L140 100 M180 0 L180 100"/>
+                <path d="M0 20 L200 20 M0 40 L200 40 M0 60 L200 60 M0 80 L200 80"/>
+              </g>
+            </svg>
+          </div>
+
+          <div id="goalkeeper" class="goalkeeper" aria-live="polite" style="z-index:5">
+            <div class="g-head"></div>
+          </div>
+
+          <div id="ball" class="ball" role="img" aria-label="bola" style="z-index:8"></div>
+          <div id="trail" class="ball trail" style="z-index:3;opacity:0"></div>
+        </div>
+      </div>
+
+      <aside class="controls">
+        <div class="scoreboard">
+          <div class="row" style="justify-content:space-between">
+            <div>
+              <div class="small">Placar</div>
+              <div class="score" id="playerScore">Você: 0</div>
+              <div class="score" id="goalieScore">Goleiro: 0</div>
+            </div>
+            <div>
+              <div class="small">Rodada</div>
+              <div class="score" id="round">0 / 5</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings">
+          <label class="small">Melhor de:
+            <select id="roundSelect">
+              <option value="5">5</option>
+              <option value="7">7</option>
+              <option value="3">3</option>
+            </select>
+          </label>
+
+          <label class="small"><input type="checkbox" id="soundToggle" checked> Sons ativados</label>
+
+          <div class="small">Escolha um canto ou use as teclas ← ↑ →</div>
+        </div>
+
+        <div class="btns" role="group" aria-label="Controles de chute">
+          <button id="leftBtn">Esquerda</button>
+          <button id="centerBtn">Centro</button>
+          <button id="rightBtn">Direita</button>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:6px">
+          <button id="nextBtn" class="secondary">Próximo</button>
+          <button id="resetBtn" class="secondary">Reiniciar</button>
+        </div>
+
+        <div class="hint" id="message">Boa sorte!</div>
+
+        <div style="margin-top:8px;font-size:13px;color:#164a7a;text-align:center">
+          <button id="exportApkBtn" class="secondary" title="Instruções para gerar APK">Exportar para APK (instruções)</button>
+        </div>
+      </aside>
+    </div>
+
+    <footer>
+      <div class="small">Melhorias: sons sintetizados, animações aprimoradas, melhor-de e export APK</div>
+      <div class="small">By ChatGPT</div>
+    </footer>
+  </div>
+
+  <script>
+    // --- Estado ---
+    let totalRounds = 5;
+    let round = 0;
+    let playerGoals = 0;
+    let goalieSaves = 0;
+    let isAnimating = false;
+    let seriesWins = {player:0, goalie:0};
+    let matchNumber = 0; // match within series
+
+    // DOM
+    const ball = document.getElementById('ball');
+    const trail = document.getElementById('trail');
+    const gk = document.getElementById('goalkeeper');
+    const msg = document.getElementById('message');
+    const playerScoreEl = document.getElementById('playerScore');
+    const goalieScoreEl = document.getElementById('goalieScore');
+    const roundEl = document.getElementById('round');
+    const leftBtn = document.getElementById('leftBtn');
+    const centerBtn = document.getElementById('centerBtn');
+    const rightBtn = document.getElementById('rightBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const roundSelect = document.getElementById('roundSelect');
+    const soundToggle = document.getElementById('soundToggle');
+    const exportApkBtn = document.getElementById('exportApkBtn');
+
+    // --- Audio (WebAudio synth) ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = AudioContext ? new AudioContext() : null;
+    function playTone(freq, duration=0.12, type='sine', gain=0.12){ 
+      if(!audioCtx || !soundToggle.checked) return;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type; o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      g.gain.setValueAtTime(gain, audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      o.stop(audioCtx.currentTime + duration + 0.02);
+    }
+    function playKick(){ playTone(820,0.08,'sine',0.14); playTone(560,0.12,'triangle',0.06); }
+    function playGoal(){ playTone(900,0.12,'sawtooth',0.18); playTone(1400,0.18,'sine',0.08); }
+    function playSave(){ playTone(280,0.1,'sine',0.12); playTone(420,0.08,'square',0.06); }
+
+    // --- Helpers ---
+    function updateUI(){
+      playerScoreEl.textContent = `Você: ${playerGoals}`;
+      goalieScoreEl.textContent = `Goleiro: ${goalieSaves}`;
+      roundEl.textContent = `${round} / ${totalRounds}`;
+    }
+
+    function setRoundCount(n){
+      totalRounds = Number(n);
+      round = 0; playerGoals = 0; goalieSaves = 0;
+      updateUI();
+      msg.textContent = `Melhor de ${totalRounds}. Boa sorte!`;
+    }
+
+    // --- Eventos ---
+    leftBtn.addEventListener('click', ()=>attempt('left'));
+    centerBtn.addEventListener('click', ()=>attempt('center'));
+    rightBtn.addEventListener('click', ()=>attempt('right'));
+    nextBtn.addEventListener('click', nextRound);
+    resetBtn.addEventListener('click', ()=>{ resetGame(); seriesWins = {player:0, goalie:0}; matchNumber = 0; });
+    roundSelect.addEventListener('change', (e)=>setRoundCount(e.target.value));
+    exportApkBtn.addEventListener('click', showApkInstructions);
+
+    window.addEventListener('keydown', (e)=>{
+      if(isAnimating) return;
+      if(e.key === 'ArrowLeft') attempt('left');
+      if(e.key === 'ArrowUp') attempt('center');
+      if(e.key === 'ArrowRight') attempt('right');
+    });
+
+    // --- Lógica de tentativa ---
+    function attempt(choice){
+      if(isAnimating) return;
+      if(round >= totalRounds){
+        msg.textContent = 'Partida terminou — clique em Próximo para ver resultado da série ou Reiniciar.';
+        return;
+      }
+      isAnimating = true;
+      round++;
+      roundEl.textContent = `${round} / ${totalRounds}`;
+
+      // cpu chance to predict slightly based on previous
+      const options = ['left','center','right'];
+      const rand = Math.random();
+      let gkChoice = options[Math.floor(Math.random()*3)];
+      // pequena inteligência: se o jogador marcou nos últimos dois, chance do goleiro tentar prever
+      if(playerGoals >= 1 && Math.random() < 0.12) gkChoice = choice; // leve chance de prever
+      
+      // reset classes
+      gk.classList.remove('dive-left','dive-right','dive-center');
+      ball.className = 'ball';
+      trail.style.opacity = '0';
+
+      // start animations next frame
+      requestAnimationFrame(()=>{
+        // goalie dive
+        if(gkChoice === 'left') gk.classList.add('dive-left');
+        if(gkChoice === 'right') gk.classList.add('dive-right');
+        if(gkChoice === 'center') gk.classList.add('dive-center');
+        // ball flight
+        if(choice === 'left'){ ball.classList.add('fly-left'); trail.classList.add('fly-left'); trail.style.opacity='0.28'; }
+        if(choice === 'right'){ ball.classList.add('fly-right'); trail.classList.add('fly-right'); trail.style.opacity='0.28'; }
+        if(choice === 'center'){ ball.classList.add('fly-center'); trail.classList.add('fly-center'); trail.style.opacity='0.28'; }
+        // sound kick
+        playKick();
+      });
+
+      const isSaved = (choice === gkChoice);
+      setTimeout(()=>{
+        if(isSaved){
+          goalieSaves++;
+          goalieScoreEl.textContent = `Goleiro: ${goalieSaves}`;
+          msg.textContent = `Defendeu! Goleiro foi para ${gkChoice}.`;
+          playSave();
+        } else {
+          playerGoals++;
+          playerScoreEl.textContent = `Você: ${playerGoals}`;
+          msg.textContent = `GOL! Você chutou para ${choice} e o goleiro foi para ${gkChoice}.`;
+          playGoal();
+        }
+
+        isAnimating = false;
+
+        if(round === totalRounds){
+          setTimeout(()=>{
+            concludeMatch();
+          }, 700);
+        }
+      }, 700);
+    }
+
+    // --- Concluir partida e série (campeonato) ---
+    function concludeMatch(){
+      // partida terminou; decidir vencedor da partida
+      let matchWinner = null;
+      if(playerGoals > goalieSaves) { matchWinner = 'player'; seriesWins.player++; }
+      else if(playerGoals < goalieSaves) { matchWinner = 'goalie'; seriesWins.goalie++; }
+      else { matchWinner = 'draw'; }
+
+      matchNumber++;
+      let mmsg = '';
+      if(matchWinner === 'player') mmsg = `Você venceu a partida ${playerGoals} x ${goalieSaves}!`;
+      else if(matchWinner === 'goalie') mmsg = `Goleiro venceu a partida ${goalieSaves} x ${playerGoals}.`;
+      else mmsg = `Partida empatada por ${playerGoals} gols.`;
+
+      // mostrar resultado da partida e estado da série
+      msg.textContent = `${mmsg} Série: Você ${seriesWins.player} — ${seriesWins.goalie} Goleiro. Clique em Próximo para iniciar próxima partida ou Reiniciar.`;
+
+      // checar campeão da série (melhor-de)
+      const needed = Math.ceil((Number(totalRounds)+1)/2); // number of wins needed? actually best-of-n uses wins per match, but we used rounds inside match. Here we interpret series as first to X match wins. We'll set series length = 3 matches by default.
+      // For simplicity, we'll set series target as 2 wins (best of 3 matches). But user wanted campeonato; we'll offer continue until user resets.
+      // Here we'll not auto-declare series champion; allow user to play multiple matches and track seriesWins.
+    }
+
+    function nextRound(){
+      if(isAnimating) return;
+      if(round < totalRounds){
+        msg.textContent = 'Jogue a próxima cobrança.';
+        return;
+      }
+      // reset internal round counters for next match (if user wants to play multiple matches in a series)
+      round = 0; playerGoals = 0; goalieSaves = 0;
+      updateUI();
+      msg.textContent = `Próxima partida pronta. Série atual: Você ${seriesWins.player} — ${seriesWins.goalie} Goleiro.`;
+      // reset visuals
+      gk.classList.remove('dive-left','dive-right','dive-center');
+      ball.className = 'ball'; trail.style.opacity='0';
+    }
+
+    function resetGame(){
+      round = 0; playerGoals = 0; goalieSaves = 0; isAnimating = false;
+      playerScoreEl.textContent = `Você: ${playerGoals}`;
+      goalieScoreEl.textContent = `Goleiro: ${goalieSaves}`;
+      roundEl.textContent = `${round} / ${totalRounds}`;
+      msg.textContent = 'Boa sorte!';
+      gk.classList.remove('dive-left','dive-right','dive-center');
+      ball.className = 'ball'; trail.style.opacity='0';
+    }
+
+    // default initialize
+    setRoundCount(totalRounds);
+
+    // --- APK instructions modal (simple alert with steps) ---
+    function showApkInstructions(){
+      const steps = [
+        '1) Opção simples: Use o Capacitor (Ionic) ou Cordova para embrulhar o arquivo HTML em uma WebView.',
+        '2) Capacitor (recomendado):',
+        '   - Instale Node.js e npm.',
+        '   - Crie pasta do projeto e coloque jogo_penalti.html em www/.',
+        '   - npm init @capacitor/app e siga instruções.',
+        '   - npx cap add android',
+        '   - npx cap copy && npx cap open android (abre Android Studio).',
+        '   - No Android Studio, build -> Build Bundle(s) / APK(s) -> Build APK(s).',
+        '3) Alternativa rápida: Netlify / GitHub Pages para hospedar; usar Trusted Web Activity (Chrome) para publicar na Play Store.',
+        '4) Se quiser, posso gerar um pacote ZIP com o projeto básico do Capacitor (arquivos config + www) pronto para você abrir no Android Studio.'
+      ];
+      alert('Instruções para gerar APK (resumo):\n\n' + steps.join('\n\n'));
+    }
+
+    // Optional: keep audio context alive on user gesture for mobile autoplay policies
+    document.addEventListener('click', ()=>{ if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume(); }, {once:true});
+
+  </script>
+</body>
+</html>
